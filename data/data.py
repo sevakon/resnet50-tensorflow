@@ -26,14 +26,24 @@ def load_set(folder_path):
     classes = list(filter(lambda file: os.path.isdir(os.path.join(folder_path, file)), files))
     n_classes = len(classes)
 
+    # Log Classes to Command Line
     logging.info("               Found {0} classes".format(n_classes))
     logging.info("    Listing them below in format index - class")
 
+    # Create Classes Dict
     classes_dict = {}
     for i, img_class in enumerate(classes):
         logging.info("          index    {}:      {}".format(i, img_class))
         classes_dict[i] = img_class
 
+
+    # Define function for generating label
+    def generate_label(index, n_classes):
+        label = [0.0] * n_classes
+        label[index] = 1.0
+        return label
+
+    # Get filnames and labels list
     filenames = []
     labels = []
 
@@ -45,10 +55,8 @@ def load_set(folder_path):
             filenames.append(img_path)
             labels.append(generate_label(i, n_classes))
 
-def generate_label(index, n_classes):
-    label = [0.0] * n_classes
-    label[index] = 1.0
-    return label
+    return classes_dict, filenames, labels
+
 
 def divide_set(filenames, labels):
     """
@@ -69,10 +77,14 @@ def divide_set(filenames, labels):
         - valid_filenames: 20% of images
         - valid_labels: probabilities of the validation images
     """
+    # Config Logging
+    logging.basicConfig(level=logging.INFO)
+
+    # Get number of images
     dataset_size = len(filenames)
 
+    # Create dictionary filename: it's scores and shuffle filenames
     dictionary = dict(zip(filenames, labels))
-
     random.shuffle(filenames)
 
     train_filenames = []
@@ -81,14 +93,17 @@ def divide_set(filenames, labels):
     valid_filenames = []
     valid_labels = []
 
+    # Calculate 80% and 20% of number of images
     train_dataset_size = dataset_size * 8 // 10
     valid_dataset_size = dataset_size - train_dataset_size
 
-    print("-----------------------------------------")
-    print("Found {0} images for training dataset".format(train_dataset_size))
-    print("Found {0} images for validation dataset".format(valid_dataset_size))
-    print("-----------------------------------------")
+    # Log number of train and valid samples
+    logging.info("-----------------------------------------")
+    logging.info("   Found {0} images for training dataset".format(train_dataset_size))
+    logging.info("   Found {0} images for validation dataset".format(valid_dataset_size))
+    logging.info("-----------------------------------------")
 
+    # Split samples in Train and Val sets 
     for i, file in enumerate(filenames):
         if i <= train_dataset_size:
             train_filenames.append(file)
