@@ -3,6 +3,7 @@ from model.layers import *
 from data.utils import _parse_function, train_preprocess
 from data.data import divide_set
 
+import logging
 import time
 
 class ResNet50(object):
