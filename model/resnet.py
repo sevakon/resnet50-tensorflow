@@ -24,8 +24,8 @@ class ResNet50(object):
         self.epsilon = 1e-08
 
         # self.batch_size = 32
-        self.batch_size = 1
-        self.num_classes = 2
+        self.batch_size = 32
+        self.num_classes = 10
 
         self.is_training = True
         self.input_tensor = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, self.n_channels])
@@ -44,7 +44,7 @@ class ResNet50(object):
         train_f, train_l, valid_f, valid_l = divide_set(filenames, labels)
 
         # Define lambda function for parsing images and augmentation
-        parse_fn = lambda f, l: _parse_function(f, l, self.image_size)
+        parse_fn = lambda f, l: _parse_function(f, l, self.n_channels, self.image_size)
         train_fn = lambda f, l: train_preprocess(f, l)
 
         # Creates Iterator over the Training Set
@@ -156,7 +156,7 @@ class ResNet50(object):
         with tf.name_scope('batch-summaries'):
             tf.summary.scalar('batch-loss', self.loss)
             tf.summary.scalar('batch-accuracy', self.accuracy)
-            tf.summary.histogram('histogram loss', self.loss)
+            tf.summary.histogram('histogram-loss', self.loss)
             self.summary_op = tf.summary.merge_all()
 
         with tf.name_scope('trainig'):
