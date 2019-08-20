@@ -203,9 +203,9 @@ class ResNet50(object):
         avg_loss = total_loss/n_batches
         avg_acc = total_acc/n_batches
         self.write_average_summary(sess, writer, epoch, avg_loss, avg_acc)
-        print('Training loss at epoch {0}: {1}'.format(epoch, avg_loss))
-        print('Training accuracy at epoch {0}: {1}'.format(epoch, avg_acc))
-        print('Took: {0} seconds'.format(time.time() - start_time))
+        logging.info('Training loss at epoch {0}: {1}'.format(epoch, avg_loss))
+        logging.info('Training accuracy at epoch {0}: {1}'.format(epoch, avg_acc))
+        logging.info('Took: {0} seconds'.format(time.time() - start_time))
         return step + n_batches
 
 
@@ -229,15 +229,18 @@ class ResNet50(object):
         avg_loss = total_loss/n_batches
         avg_acc = total_acc/n_batches
         self.write_average_summary(sess, writer, epoch, avg_loss, avg_acc)
-        print('Validation loss at epoch {0}: {1} '.format(epoch, avg_loss))
-        print('Validation accuracy at epoch {0}: {1} '.format(epoch, avg_acc))
-        print('Took: {0} seconds'.format(time.time() - start_time))
+        logging.info('Validation loss at epoch {0}: {1} '.format(epoch, avg_loss))
+        logging.info('Validation accuracy at epoch {0}: {1} '.format(epoch, avg_acc))
+        logging.info('Took: {0} seconds'.format(time.time() - start_time))
         return step + n_batches
 
     def train(self, n_epochs):
         '''
         This train function alternates between training and evaluating once per epoch run
         '''
+        # Config Logging
+        logging.basicConfig(level=logging.INFO)
+
         train_writer = tf.summary.FileWriter('logs/train')
         val_writer = tf.summary.FileWriter('logs/val')
 
@@ -247,10 +250,11 @@ class ResNet50(object):
             sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver()
             # upload existing saves
-
             train_step = self.global_step.eval()
             val_step = train_step
             for epoch in range(n_epochs):
                 train_step = self.train_one_epoch(sess, saver, self.train_iterator_init_op, train_writer, epoch, train_step)
                 val_step = self.eval_once(sess, self.train_iterator_init_op, val_writer, epoch, val_step)
+                # Save Each Epoch
+                save_path = saver.save(sess, "/training/model{}.ckpt".format(epoch))
         writer.close()
