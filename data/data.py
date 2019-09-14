@@ -1,8 +1,9 @@
 import random
 import logging
 import os
+import json
 
-def load_set(folder_path):
+def load_set(folder_path, only_dict=False):
     """
     Load Training Set
 
@@ -12,6 +13,8 @@ def load_set(folder_path):
 
         Args:
         - folder_path: path to Dataset folder
+        - only-dict: Boolean variable if only classes dictionary is needed
+        Default false
 
         Returns:
         - classes_dict: dictionary of index : 'class'
@@ -27,6 +30,7 @@ def load_set(folder_path):
     n_classes = len(classes)
 
     # Log Classes to Command Line
+    logging.info("---------------------------------".format(n_classes))
     logging.info("               Found {0} classes".format(n_classes))
     logging.info("    Listing them below in format index - class")
 
@@ -36,6 +40,9 @@ def load_set(folder_path):
         logging.info("          index    {}:      {}".format(i, img_class))
         classes_dict[i] = img_class
 
+    # If Only Description for each index is required (In Prediction Script)
+    if only_dict:
+        return classes_dict
 
     # Define function for generating label
     def generate_label(index, n_classes):
@@ -48,12 +55,19 @@ def load_set(folder_path):
     labels = []
 
     for i, img_class in enumerate(classes):
+        # count number of images in each class
+        n_class_img = 0
         img_class_path = os.path.join(folder_path, img_class)
         images = os.listdir(img_class_path)
         for img in images:
-            img_path = os.path.join(img_class_path, img)
-            filenames.append(img_path)
-            labels.append(generate_label(i, n_classes))
+            if img.endswith('.png') or img.endswith('.jpg'):
+                img_path = os.path.join(img_class_path, img)
+                filenames.append(img_path)
+                labels.append(generate_label(i, n_classes))
+                n_class_img += 1
+
+        # log number of images in class
+        logging.info("     Found {} images for {} class".format(n_class_img, img_class))
 
     return classes_dict, filenames, labels
 
@@ -103,7 +117,7 @@ def divide_set(filenames, labels):
     logging.info("   Found {0} images for validation dataset".format(valid_dataset_size))
     logging.info("-----------------------------------------")
 
-    # Split samples in Train and Val sets 
+    # Split samples in Train and Val sets
     for i, file in enumerate(filenames):
         if i <= train_dataset_size:
             train_filenames.append(file)
@@ -113,3 +127,52 @@ def divide_set(filenames, labels):
             valid_labels.append(dictionary[file])
 
     return train_filenames, train_labels, valid_filenames, valid_labels
+
+
+def parse_json(configfile) -> tuple:
+    with open(configfile) as jsonfile:
+        dict = json.load(jsonfile)
+
+        try:
+            image = dict['image']
+            optimizer = dict['optimizer']
+            training = dict['training']
+        except:
+            print("Failed parsing JSON: NO 'Image', 'Optimizer', 'Training'")
+            exit()
+
+        try:
+            image_size = image['image_size']
+            n_channels = image['n_channels']
+        except:
+            print("Failed parsing JSON: NO 'image_size', 'n_channels' inside 'image'")
+            exit()
+
+        try:
+            lr = optimizer['lr']
+            beta1 = optimizer['beta1']
+            beta2 = optimizer['beta2']
+            epsilon = optimizer['epsilon']
+        except:
+            print("Failed parsing JSON: NO 'lr', 'beta1', 'beta2', 'epsilon' inside 'optimizer'")
+            exit()
+
+        try:
+            batch_size = training['batch_size']
+        except:
+            print("Failed parsing JSON: NO 'batch_size' inside 'training'")
+            exit()
+
+        return (image_size, n_channels), (lr, beta1, beta2, epsilon), batch_size
+
+
+def get_images_from_folder(folder) -> list:
+    filenames = []
+
+    files = os.listdir(folder)
+    for file in files:
+        if file.endswith('.png') or file.endswith('.jpg'):
+            img_path = os.path.join(folder, file)
+            filenames.append(img_path)
+
+    return filenames
