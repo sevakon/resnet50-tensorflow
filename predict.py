@@ -40,7 +40,7 @@ def main():
 
     parser.add_argument("-img", "--img-folder", required=True,
                         help="specify path to images to make prediction")
-    parser.add_argument("-d", "--data-folder", required=True,
+    parser.add_argument("-f", "--data-folder", required=True,
                         help="path to Training Dataset to get class dict")
     parser.add_argument("-mod","--model-folder", required=True,
                         help="specify path to folder with saved model")
