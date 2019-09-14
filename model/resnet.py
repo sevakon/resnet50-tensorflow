@@ -12,8 +12,6 @@ import time
 class ResNet50(object):
     '''
     ResNet 50 Model
-    Takes a 224x224x1 image [0-1]
-    Predicts 10 classes
     '''
 
     def __init__(self, config, n_classes):
