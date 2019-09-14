@@ -1,6 +1,14 @@
 import tensorflow as tf
 
 def _parse_function(filename, label, n_channels, size):
+    """
+    Returns resized and normalized image and its label
+    """
+    resized_image = _parse_image(filename, n_channels, size)
+    return resized_image, label
+
+
+def _parse_image(filename, n_channels, size):
     """Obtain the image from the filename (for both training and validation).
     The following operations are applied:
         - Decode the image from jpeg format
@@ -15,11 +23,10 @@ def _parse_function(filename, label, n_channels, size):
 
     resized_image = tf.image.resize_images(image, [size, size])
 
-    return resized_image, label
+    return resized_image
 
 
 def train_preprocess(filename, label, random_flip=True):
     """
     Data Augmentation
     """
-    
