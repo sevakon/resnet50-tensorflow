@@ -1,10 +1,13 @@
 import tensorflow as tf
 from model.layers import *
-from data.utils import _parse_function, train_preprocess
-from data.data import divide_set
+from data.utils import _parse_function, _parse_image, train_preprocess
+from data.data import divide_set, get_images_from_folder, parse_json
+
+from tensorflow.python import debug as tf_debug
 
 import logging
 import time
+
 
 class ResNet50(object):
     '''
@@ -13,23 +16,46 @@ class ResNet50(object):
     Predicts 10 classes
     '''
 
-    def __init__(self):
-        # load hyperparameters with config file
-        self.image_size = 224
-        self.n_channels = 1
-
-        # Adam Optimizer
-        self.lr = 0.001
-        self.beta1 = 0.9
-        self.beta2 = 0.999
-        self.epsilon = 1e-08
-
-        # self.batch_size = 32
-        self.batch_size = 32
-        self.num_classes = 10
+    def __init__(self, config, n_classes):
+        # Config Logging and log TF Version
+        logging.basicConfig(level=logging.INFO)
+        logging.info("-----------------------------------------")
+        logging.info("         USING TF Version {}".format(tf.__version__))
 
         self.is_training = True
+
+        # load hyperparameters with config file
+        # (image), (optimizer), batch_size
+        (image_size, n_channels), (lr, beta1, beta2, epsilon), batch_size = parse_json(config)
+
+        # image
+        self.image_size = image_size
+        self.n_channels = n_channels
+
+        # optimizer
+        self.lr = lr
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+
+        # batch size
+        self.batch_size = batch_size
+
+        # Output Layer
+        self.num_classes = n_classes
+
+        # Input Layer
         self.input_tensor = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, self.n_channels])
+
+        logging.info("---------------------------------------")
+        logging.info("             MODEL CONFIG              ")
+        logging.info("               OPTIMIZER               ")
+        logging.info(" LR: {}, BETA1: {}, BETA2: {}, EPSILON: {}".format(self.lr, self.beta1, self.beta2, self.epsilon))
+        logging.info("                 IMAGE                 ")
+        logging.info("  IMAGE SIZE: {}, CHANNELS_NUMBER: {}  ".format(self.image_size, self.n_channels))
+        logging.info("                TRAINING               ")
+        logging.info("             BATCH SIZE: {}            ".format(self.batch_size))
+
 
 
     def load_data(self, filenames, labels):
@@ -62,7 +88,7 @@ class ResNet50(object):
 
         # Creates Iterator over the Validation Set
         with tf.name_scope('valid-data'):
-            valid_dataset = (tf.data.Dataset.from_tensor_slices((tf.constant(train_f), tf.constant(train_l)))
+            valid_dataset = (tf.data.Dataset.from_tensor_slices((tf.constant(valid_f), tf.constant(valid_l)))
                 .map(parse_fn, num_parallel_calls=4)
                 .batch(self.batch_size)
                 .prefetch(1)
@@ -73,6 +99,10 @@ class ResNet50(object):
 
         # Get Input and Output for Graph Inference
         self.images, self.labels = train_iterator.get_next()
+
+
+    # ----------------------------  GRAPH  ----------------------------- #
+
 
     def inference(self):
         '''
@@ -116,6 +146,9 @@ class ResNet50(object):
         with tf.variable_scope('fc'):
             self.pool2 = avgpool(self.block4_3, 7, 1, 'pool2')
             self.logits = fc_layer(self.pool2, 2048, self.num_classes, 'fc1')
+
+
+    # ---------------------------  TRAINING  ---------------------------- #
 
 
     def loss(self):
@@ -202,7 +235,7 @@ class ResNet50(object):
             pass
 
         avg_loss = total_loss/n_batches
-        avg_acc = total_acc/n_batches
+        avg_acc = total_acc/n_batches/self.batch_size
         self.write_average_summary(sess, writer, epoch, avg_loss, avg_acc)
         logging.info('Training loss at epoch {0}: {1}'.format(epoch, avg_loss))
         logging.info('Training accuracy at epoch {0}: {1}'.format(epoch, avg_acc))
@@ -228,14 +261,15 @@ class ResNet50(object):
             pass
 
         avg_loss = total_loss/n_batches
-        avg_acc = total_acc/n_batches
+        avg_acc = total_acc/n_batches/self.batch_size
         self.write_average_summary(sess, writer, epoch, avg_loss, avg_acc)
         logging.info('Validation loss at epoch {0}: {1} '.format(epoch, avg_loss))
         logging.info('Validation accuracy at epoch {0}: {1} '.format(epoch, avg_acc))
         logging.info('Took: {0} seconds'.format(time.time() - start_time))
         return step + n_batches
 
-    def train(self, n_epochs):
+
+    def train(self, n_epochs, debug=False):
         '''
         This train function alternates between training and evaluating once per epoch run
         '''
@@ -248,8 +282,12 @@ class ResNet50(object):
         train_writer.add_graph(tf.get_default_graph())
 
         with tf.Session() as sess:
+            # Wrap Debug Session
+            if debug:
+                sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+
             sess.run(tf.global_variables_initializer())
-            saver = tf.train.Saver()
+            saver = tf.train.Saver(max_to_keep=100)
             # upload existing saves
             train_step = self.global_step.eval()
             val_step = train_step
@@ -259,3 +297,73 @@ class ResNet50(object):
                 # Save Each Epoch
                 save_path = saver.save(sess, "training/epoch{}/model.ckpt".format(epoch))
         writer.close()
+
+
+    # ---------------------------  PREDICTION  ---------------------------- #
+
+
+    def load_pred(self, folder):
+        '''
+        Creates Prediction Dataset
+        '''
+        # Get All Images From Folder
+        filenames = get_images_from_folder(folder)
+        # Calculating Batch Size
+        batch = len(filenames)
+        logging.info("       FOUND {0} IMAGES TO PREDICT".format(batch))
+
+        # Parsing Images
+        parse_fn = lambda f: _parse_image(f, self.n_channels, self.image_size)
+
+        # Creates Iterator over the Prediction DataSet
+        with tf.name_scope('predict-data'):
+            predict_dataset = (tf.data.Dataset.from_tensor_slices(tf.constant(filenames))
+                .map(parse_fn, num_parallel_calls=4)
+                .batch(batch)
+            )
+
+            predict_iterator = predict_dataset.make_initializable_iterator()
+            self.predict_iterator_init_op = predict_iterator.initializer
+
+        # Pass Batch of Images into Model's Input
+        self.images = predict_iterator.get_next()
+        # Return filenames to match them with Predictions
+        return filenames
+
+
+    def predict(self, weights, is_logging=False, debug=False):
+        '''
+        Loads graph and weights,
+        creates a feed dict and passes it through the model
+        returns predictions
+        '''
+        # Build Computational Graph
+        self.inference()
+        self.training = False
+
+        # Logging to TensorBoard
+        if is_logging:
+            writer = tf.summary.FileWriter('logs/predict')
+            writer.add_graph(tf.get_default_graph())
+            writer.close()
+
+        # Get Predictions
+        with tf.Session() as sess:
+            # Wrap Debug Session
+            if debug:
+                sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+            # Restoring Weights From Trained Model
+            sess.run(tf.global_variables_initializer())
+            saver = tf.train.Saver()
+            saver.restore(sess, weights)
+            logging.info("Finished restoring weights")
+
+            # Passing images through Model
+            start_time = time.time()
+            logging.info("Started evaluating images")
+            sess.run(self.predict_iterator_init_op)
+            predictions = sess.run(softmax(self.logits))
+            logging.info('Took: {0} seconds'.format(time.time() - start_time))
+
+        # Return Prediction for further Results Interpretation
+        return predictions
