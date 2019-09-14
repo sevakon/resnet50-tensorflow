@@ -11,7 +11,17 @@ import tensorflow as tf
 import numpy as np
 import logging
 
+from matplotlib import pyplot as plt
+from PIL import Image
+
 JSON_CONFIG = 'config.json'
+
+
+def show_results(filename, classname, accuracy):
+    image = Image.open(filename)
+    plt.imshow(image)
+    plt.title("This is {} with {}%".format(classname, accuracy))
+    plt.show()
 
 
 def interpret(filenames, predictions, classes_dict):
@@ -24,6 +34,7 @@ def interpret(filenames, predictions, classes_dict):
         accuracy = prediction[class_index]
         class_name = classes_dict[class_index]
         print("is {} with {}%".format(class_name, accuracy * 100))
+        show_results(file, class_name, accuracy * 100)
 
 
 def predict(model_folder, image_folder, classes_dict, debug=False):
