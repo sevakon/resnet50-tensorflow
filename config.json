@@ -1,1 +1,15 @@
-
+{
+  "image": {
+    "image_size": 224,
+    "n_channels": 3
+  },
+  "optimizer": {
+    "lr": 0.001,
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "epsilon": 1e-8
+  },
+  "training": {
+    "batch_size": 32
+  }
+}
