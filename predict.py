@@ -31,7 +31,7 @@ def predict(model_folder, image_folder, classes_dict, debug=False):
     n_classes = len(classes_dict)
     model = ResNet50(JSON_CONFIG, n_classes)
     filenames = model.load_pred(image_folder)
-    predictions = model.predict(weights, debug)
+    predictions = model.predict(weights, debug=debug)
     interpret(filenames, predictions, classes_dict)
 
 
